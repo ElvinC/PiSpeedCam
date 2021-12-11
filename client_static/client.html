@@ -3,17 +3,28 @@
 <head>
 	<title>Client</title>
 	<style type="text/css">
+
+		:root {
+		  --dark1: #202529;
+		  --dark2: #32383D;
+		  --light1: #4C555C;
+		  --light2: #A1B4C4;
+		  --accent: #48C79A;
+		  --warning: #C73B32;
+		}
+
 		body {
 			margin: 0;
 			padding:0;
-			background-color: #444;
+			background-color: #202529;
 			box-sizing: border-box;
+			color: white;
 		}
 
 		#main_container {
 			width: 100%;
 			height: 100vh;
-			background-color:  #444;
+			background-color: var(--light1);
 			color: white;
 			font-family: sans-serif;
 			font-size: 18px;
@@ -24,7 +35,10 @@
 			text-align: center;
 			padding: 10px;
 			box-sizing: border-box;
-			background-color: #333;
+			background-color: var(--dark2);
+			box-shadow: 0 0px 10px rgba(0,0,0,0.5);
+			z-index: 100;
+			margin-bottom: 20px;
 		}
 
 		a {
@@ -33,8 +47,8 @@
 
 		#image_wrapper {
 			width: 100%;
-			height: 40vh;
-			background-color: #555;
+			min-height: 200px;
+			text-align: center;
 		}
 
 		#img_viewer {
@@ -43,25 +57,95 @@
 			max-height: 100%;
 			vertical-align: middle;
 		}
+
+		button {
+			background-color: var(--accent);
+			border: none;
+			color: black;
+			padding: 6px;
+			min-width: 150px;
+			box-shadow: 0 0px 10px rgba(0,0,0,0.5);
+		}
+
+		button:active {
+			background-color: var(--warning);
+			box-shadow: 0 0px 3px rgba(0,0,0,0.5);
+		}
+
+		#footer {
+			position: fixed;
+			bottom: 0;
+			left:0;
+			width: 100%;
+			box-sizing: border-box;
+			background-color: var(--dark2);
+			padding:10px;
+			box-shadow: 0 0px 10px rgba(0,0,0,0.5);
+			line-height: 28px;
+		}
+
+		.footer_line {
+			width: 100%;
+			margin-top: 5px;
+			margin-bottom: 5px;
+		}
+
+		#debug_log {
+			min-width: 50%;
+			height: 300px;
+			font-family: monospace;
+			font-size: 14px;
+			background-color: var(--dark1);
+			padding:10px;
+			overflow-y: scroll;
+		}
+
+		.center {
+			text-align: center;
+		}
 	</style>
 </head>
 <body>
 	<div id="main_container">
-		<div class="header">PiSpeedCam client 0.0.1 (<a href="https://github.com/ElvinC/PiSpeedCam">source</a>)</div>
+		<div class="header">PiSpeedCam Control Panel v0.1.0 <a style="font-size:10px" href="https://github.com/ElvinC/PiSpeedCam">source code</a></div>
 		<div id="image_wrapper">
+			Preview:
 			<img id="img_viewer" src="">
 		</div>
-		Record time (ms)
-		<input type="number" value="5000">
-		<button>Capture!</button>
+		<div class="center">Debug log:</div>
+		<div id="debug_log"></div>
+		<div id="footer">
+			<div class="footer_line">Record time (ms)
+				<input type="number" value="5000">
+				<button>Capture!</button>
+				<button>Preview last recording</button>
+				<button>Transfer last recording</button>
+			</div>
+			
+		</div>
+
 	</div>
 
 </body>
 <script type="text/javascript">
 	var ws = new WebSocket("ws://" + location.host + "/websocket/");
 
+	function add_debug(msg) {
+		var date = new Date()
+		var ms = String(date.getMilliseconds())
+		while (ms.length < 4) {
+			ms += "0"
+		}
+		var timestamp = "<" + date.toISOString().substr(11, 8) + ":"+ ms + "> "
+		var DL = document.getElementById("debug_log")
+		DL.innerText += "\n" + timestamp + msg;
+
+		DL.scrollTop = DL.scrollHeight;
+	}
+
 	ws.onmessage = function (event) {
 		img_viewer.src = event.data;
+		add_debug("Image received")
 	}
 
 </script>
