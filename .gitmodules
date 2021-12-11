@@ -1,0 +1,8 @@
+[submodule "dependencies/fork-raspiraw"]
+	path = dependencies/fork-raspiraw
+	ignore = dirty
+	url = https://github.com/Hermann-SW/fork-raspiraw.git
+[submodule "dependencies/dcraw"]
+	path = dependencies/dcraw
+	ignore = dirty
+	url = https://github.com/6by9/dcraw

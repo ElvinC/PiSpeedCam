@@ -10,6 +10,7 @@ import base64
 import platform
 import os
 import time
+from datetime import datetime
 
 import config
 
@@ -46,19 +47,27 @@ class WebSocketServer(tornado.websocket.WebSocketHandler):
 			config.REFRESH_DELAY = data.get("frame_delay")
 			
 		elif data.get("command") == "CAPTURE":
+			self.capture_video(data.get("capture_ms"))
 			print("Capturing...")
 			
 		
 
 	@gen.coroutine
-	def prepare_cam():
-		proc = Subprocess(["camera_i2c"], stdout=Subprocess.STREAM,
+	def capture_video(self, capture_ms):
+		save_path = config.SAVE_PATH + "/" + datetime.now().strftime("%Y-%m-%dT%T")
+		save_path = os.path.abspath(save_path)
+		os.makedirs(save_path)
+		print(f"Saving recording to {save_path}")
+		
+		proc = Subprocess(["./scripts/raspiraw_trigger.sh", str(capture_ms), save_path], stdout=Subprocess.STREAM,
 										  stderr=Subprocess.STREAM)
 		
 		yield proc.wait_for_exit(raise_error=False)
 		out, err = yield [proc.stdout.read_until_close(),
 				   proc.stderr.read_until_close()]
 		print(out.decode())
+		print("Capture and processing finished")
+		config.PLAYBACK_FOLDER = save_path
 
 class MainHandler(tornado.web.RequestHandler):
 	def get(self):
@@ -74,13 +83,13 @@ class ImageSender:
 		now = time.time()
 		if config.REFRESH_DELAY/1000 + self.last_tick < now:
 			self.last_tick = now
-			path = "/home/pi/Documents/cam/pyro5/out.{:04d}.ppm.png"
-			thisfile = path.format(self.current_id)
+			filepattern = "out.{:04d}.ppm.png"
+			thisfile = os.path.join(config.PLAYBACK_FOLDER, filepattern.format(self.current_id))
 			
 			
 			if not os.path.isfile(thisfile):
 				self.current_id = 1
-				thisfile = path.format(self.current_id)
+				thisfile = os.path.join(config.PLAYBACK_FOLDER, filepattern.format(self.current_id))
 				
 			with open(thisfile, "rb") as f:
 				#self.current_id = (self.current_id + 1 ) % self.num_images

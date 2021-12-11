@@ -126,6 +126,12 @@
 				FPS: <input type="number" value="10" id="setting_playback_fps" min="1" max="25">
 				<button id="send_config_btn">Apply</button>
 			</div>
+			<div class="footer_line">
+				Preview brightness: <input type="number" step="0.01" value="1" id="preview_brightness">
+				Contrast <input type="number" step="0.01" value="1" id="preview_contrast">
+				Saturation <input type="number" step="0.01" value="1" id="preview_saturation">
+				<button id="preview_filter_btn">Apply</button>
+			</div>
 		</div>
 
 	</div>
@@ -188,11 +194,21 @@
 		if (connected) {
 			ws.send(JSON.stringify({
 				command: "CAPTURE",
-				record_length: parseInt(document.getElementById("setting_record_len").value)
+				capture_ms: parseInt(document.getElementById("setting_record_len").value)
 			}))
 		}
-		debug("Sending config");
+		debug("Sending capture command");
 	}, false)
+	
+	function update_preview_filters(event) {
+		var brightness = parseFloat(document.getElementById("preview_brightness").value);
+		var contrast = parseFloat(document.getElementById("preview_contrast").value);
+		var saturation = parseFloat(document.getElementById("preview_saturation").value);
+		document.getElementById("img_viewer").style.filter = "contrast(" + contrast + ") brightness(" + brightness + ") saturate(" + saturation + ")"
+		debug("Updating preview filters");
+	}
+	
+	document.getElementById("preview_filter_btn").addEventListener('click', update_preview_filters, false)
 	
 	attempt_reconnect();
 	
