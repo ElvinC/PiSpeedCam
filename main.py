@@ -1,9 +1,26 @@
 import random
+import json
 import tornado.ioloop
 import tornado.web
 import tornado.websocket
+from tornado.process import Subprocess
+from tornado import gen
+from subprocess import PIPE
 import base64
+import platform
+import os
+import time
 
+import config
+
+# Detect if running on raspberry pi
+IS_PI = platform.machine() == "armv7l"
+
+if IS_PI:
+	import RPi.GPIO as GPIO
+else:
+	print("Not running on raspberry pi")
+	print("Some features might not work")
 
 class WebSocketServer(tornado.websocket.WebSocketHandler):
 	clients = set()
@@ -16,27 +33,60 @@ class WebSocketServer(tornado.websocket.WebSocketHandler):
 
 	@classmethod
 	def send_message(cls, message: str):
+		#cls.prepare_cam()
 		print(f"Sending data to {len(cls.clients)} client(s).")
 		for client in cls.clients:
 			client.write_message(message)
+
+	def on_message(self, message):
+		print("Received: " + message)
+		data = json.loads(message)
+		if data.get("command") == "CONFIG":
+			config.SKIP_FRAMES = data.get("skip_frames")
+			config.REFRESH_DELAY = data.get("frame_delay")
+			
+		elif data.get("command") == "CAPTURE":
+			print("Capturing...")
+			
+		
+
+	@gen.coroutine
+	def prepare_cam():
+		proc = Subprocess(["camera_i2c"], stdout=Subprocess.STREAM,
+										  stderr=Subprocess.STREAM)
+		
+		yield proc.wait_for_exit(raise_error=False)
+		out, err = yield [proc.stdout.read_until_close(),
+				   proc.stderr.read_until_close()]
+		print(out.decode())
 
 class MainHandler(tornado.web.RequestHandler):
 	def get(self):
 		self.render("client_static/client.html")
 
-	def set_extra_headers(self, path):
-	    self.set_header("Cache-control", "no-cache")
-
 class ImageSender:
 	def __init__(self):
 		self.current_id = 0
 		self.num_images = 2
+		self.last_tick = time.time()
 
-	def sample(self):
-		
-		with open(f"test_frames/frame{self.current_id}.png", "rb") as f:
-			self.current_id = (self.current_id + 1 ) % self.num_images
-			return "data:image/png;base64," + base64.b64encode(f.read()).decode()
+	def send_image_tick(self, send_callback):
+		now = time.time()
+		if config.REFRESH_DELAY/1000 + self.last_tick < now:
+			self.last_tick = now
+			path = "/home/pi/Documents/cam/pyro5/out.{:04d}.ppm.png"
+			thisfile = path.format(self.current_id)
+			
+			
+			if not os.path.isfile(thisfile):
+				self.current_id = 1
+				thisfile = path.format(self.current_id)
+				
+			with open(thisfile, "rb") as f:
+				#self.current_id = (self.current_id + 1 ) % self.num_images
+				self.current_id += config.SKIP_FRAMES
+				msg = "data:image/png;base64," + base64.b64encode(f.read()).decode()
+				send_callback(msg)
 
 def main():
 	app = tornado.web.Application(
@@ -46,16 +96,14 @@ def main():
 		websocket_ping_timeout=30,
 		debug=True,
 	)
-	app.listen(8081)
+	app.listen(config.PORT)
 
-	# Create an event loop (what Tornado calls an IOLoop).
 	io_loop = tornado.ioloop.IOLoop.current()
 
 	# Send image
-	# every 500ms.
-	random_bernoulli = ImageSender()
+	sender = ImageSender()
 	periodic_callback = tornado.ioloop.PeriodicCallback(
-		lambda: WebSocketServer.send_message(str(random_bernoulli.sample())), 1000
+		lambda: sender.send_image_tick(WebSocketServer.send_message), 1
 	)
 	periodic_callback.start()
 

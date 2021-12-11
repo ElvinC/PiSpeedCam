@@ -116,21 +116,27 @@
 		<div id="debug_log"></div>
 		<div id="footer">
 			<div class="footer_line">Record time (ms)
-				<input type="number" value="5000">
-				<button>Capture!</button>
+				<input id="setting_record_len" type="number" value="5000">
+				<button id="capture_btn">Capture!</button>
 				<button>Preview last recording</button>
 				<button>Transfer last recording</button>
+			</div>		
+			<div class="footer_line">
+				Skip frames: <input type="number" value="1" id="setting_skip_frame">
+				FPS: <input type="number" value="10" id="setting_playback_fps" min="1" max="25">
+				<button id="send_config_btn">Apply</button>
 			</div>
-			
 		</div>
 
 	</div>
 
 </body>
 <script type="text/javascript">
-	var ws = new WebSocket("ws://" + location.host + "/websocket/");
+	var ws;
+	var connected = false;
 
-	function add_debug(msg) {
+
+	function debug(msg) {
 		var date = new Date()
 		var ms = String(date.getMilliseconds())
 		while (ms.length < 4) {
@@ -139,14 +145,62 @@
 		var timestamp = "<" + date.toISOString().substr(11, 8) + ":"+ ms + "> "
 		var DL = document.getElementById("debug_log")
 		DL.innerText += "\n" + timestamp + msg;
+		
 
 		DL.scrollTop = DL.scrollHeight;
 	}
-
-	ws.onmessage = function (event) {
-		img_viewer.src = event.data;
-		add_debug("Image received")
+	
+	function attempt_reconnect() {
+		debug("Attempting to connect...");
+		
+		ws = new WebSocket("ws://" + location.host + "/websocket/");
+		
+		ws.onopen = function (event) {
+			debug("Connection established!");
+			connected = true;
+		}
+		
+		ws.onclose = function (event) {
+			debug("Connection closed");
+			connected = false;
+			
+			setTimeout(attempt_reconnect, 5000);
+		}
+		
+		ws.onmessage = function (event) {
+			img_viewer.src = event.data;
+			//debug("Image received");
+		}
 	}
+	
+	document.getElementById("send_config_btn").addEventListener('click', function (event) {
+		if (connected) {
+			ws.send(JSON.stringify({
+				command: "CONFIG",
+				skip_frames: parseInt(document.getElementById("setting_skip_frame").value),
+				frame_delay: Math.round(1000 / parseInt(document.getElementById("setting_playback_fps").value))
+			}))
+		}
+		debug("Sending config");
+	}, false)
+	
+	document.getElementById("capture_btn").addEventListener('click', function (event) {
+		if (connected) {
+			ws.send(JSON.stringify({
+				command: "CAPTURE",
+				record_length: parseInt(document.getElementById("setting_record_len").value)
+			}))
+		}
+		debug("Sending config");
+	}, false)
+	
+	attempt_reconnect();
+	
+	
+	
+
+
+
 
 </script>
 </html>

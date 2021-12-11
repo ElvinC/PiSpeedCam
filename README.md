@@ -1,6 +1,14 @@
 # PiSpeedCam
 Low cost 1000fps high speed camera based on raspberry pi
 
+## Usage
+Start server:
+
+`pip3 install -r requirements.txt`
+
+`python main.py`
+
+Open `[Raspbery-pi IP]:8081` in a browser to access the control panel.
 
 ## What is this?
 High speed footage is cool, but proper high speed cameras cost thousands or tens of thousands of dollars. It turns out that the raspberry pi, when combined with an inexpensive camera module, is capable of recording approximate 1000 fps at a resolution of 640x75 pixels. The result is an imaging system costing less than $100, that can be used experiment with high speed videography.
