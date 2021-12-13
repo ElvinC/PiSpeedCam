@@ -1,5 +1,6 @@
 # Recordings
 captures/*
+!captures/placeholder
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -4,6 +4,6 @@ SKIP_FRAMES = 1
 SAVE_PATH = "captures"
 DEP_PATH = "dependencies"
 CAPTURE_MS = 1000
-PLAYBACK_FOLDER = "/home/pi/Documents/cam/pyro5/"
+PLAYBACK_FOLDER = "captures/placeholder/"
 RAMDISK_PATH = "/dev/shm/"
 RAW_PATTERN = "out.%04d.raw"
