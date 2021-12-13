@@ -112,6 +112,8 @@
 			Preview:
 			<img id="img_viewer" src="">
 		</div>
+		Color Histogram: <br>
+		<canvas id="histogram" style="border:1px white;border-style: solid;background-color: black;" width="257" height="100"></canvas>
 		<div class="center">Debug log:</div>
 		<div id="debug_log"></div>
 		<div id="footer">
@@ -177,6 +179,7 @@
 			var data = JSON.parse(event.data)
 			if (data.type === "image") {
 				img_viewer.src = data.image;
+				update_histogram();
 			}
 			else if (data.type === "status") {
 				debug(data.message);
@@ -219,7 +222,99 @@
 	attempt_reconnect();
 	
 	
-	
+	function update_histogram() {
+		imgEl = img_viewer
+
+	    var blockSize = 1, // only visit every 5 pixels
+	        defaultRGB = {r:0,g:0,b:0}, // for non-supporting envs
+	        canvas = document.createElement('canvas'),
+	        context = canvas.getContext && canvas.getContext('2d'),
+	        data, width, height,
+	        i = -4,
+	        length,
+	        rgb = {r:0,g:0,b:0},
+	        count = 0;
+
+	    if (!context) {
+	        return defaultRGB;
+	    }
+
+	    height = canvas.height = imgEl.naturalHeight || imgEl.offsetHeight || imgEl.height;
+	    width = canvas.width = imgEl.naturalWidth || imgEl.offsetWidth || imgEl.width;
+
+	    context.drawImage(imgEl, 0, 0);
+
+	    try {
+	        data = context.getImageData(0, 0, width, height);
+	    } catch(e) {
+	        /* security error, img on diff domain */
+	        return defaultRGB;
+	    }
+
+	    length = data.data.length;
+
+		var pixels = []
+	    while ( (i += blockSize * 4) < length ) {
+			pixels.push({
+				"r": data.data[i],
+				"g": data.data[i+1],
+				"b": data.data[i+2]
+			})
+	    }
+
+
+		var c = document.getElementById("histogram");
+		var ctx = c.getContext("2d");
+		
+		var canvasWidth = c.width;
+		var canvasHeight = c.height;
+		ctx.clearRect(0, 0, canvasWidth, canvasHeight);
+		var id = ctx.getImageData(0, 0, canvasWidth, canvasHeight);
+		//var pixels = id.data;
+
+		/*
+		var pixels = []
+		for (var i = 0; i < 640*75; i++) {
+			pixels.push({
+				"r": Math.round(Math.random() * 255),
+				"g": Math.round(Math.random() * 255),
+				"b": Math.round(Math.random() * 255)
+			})
+		} */
+		let bins = [new Array(256), new Array(256), new Array(256)]; // rgb bins
+		for (let i=0; i<256; ++i) {
+			bins[0][i] = 0;
+			bins[1][i] = 0;
+			bins[2][i] = 0;
+		}
+
+		N_pixels = 640*75
+
+		for (var i = 0; i<N_pixels; i++) {
+			bins[0][pixels[i].r] += 1;
+			bins[1][pixels[i].g] += 1;
+			bins[2][pixels[i].b] += 1;
+		}
+
+		max_val = Math.max(...bins[0], ...bins[1], ...bins[2])
+		ctx.fillStyle = "rgba(255,0,0,0.7)";
+
+		for (var i = 0; i < 256; i++) {
+			var val = bins[0][i]*100/max_val
+			ctx.fillRect(i, 100 - val, 2, val);
+		}
+		ctx.fillStyle = "rgba(0,255,0,0.7)";
+		for (var i = 0; i < 256; i++) {
+			var val = bins[1][i]*100/max_val
+			ctx.fillRect(i, 100 - val, 2, val);
+		}
+		ctx.fillStyle = "rgba(0,0,255,0.7)";
+		for (var i = 0; i < 256; i++) {
+			var val = bins[2][i]*100/max_val
+			ctx.fillRect(i, 100 - val, 2, val);
+		}
+		console.log(bins)
+	}
 
 
 
