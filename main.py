@@ -11,8 +11,12 @@ import platform
 import os
 import time
 from datetime import datetime
+import socket
 
 import config
+
+
+
 
 # Detect if running on raspberry pi
 IS_PI = platform.machine() == "armv7l"
@@ -59,9 +63,10 @@ class WebSocketServer(tornado.websocket.WebSocketHandler):
 	@classmethod
 	def send_message(cls, message: str):
 		#cls.prepare_cam()
-		print(f"Sending data to {len(cls.clients)} client(s).")
-		for client in cls.clients:
-			client.write_message(message)
+		if len(cls.clients) > 0:
+			print(f"Sending data to {len(cls.clients)} client{'' if len(cls.clients)==1 else 's'}.")
+			for client in cls.clients:
+				client.write_message(message)
 
 	def on_message(self, message):
 		print("Received: " + message)
@@ -174,8 +179,21 @@ def main():
 		debug=True,
 	)
 	app.listen(config.PORT)
-	print(f"Server started on port {config.PORT}")
+	
 
+	# Print control panel address
+	s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+	print("="*70+"\n")
+	print("\tServer started!")
+	try:
+		s.connect(('10.255.255.255', 1))
+		IP = s.getsockname()[0]
+		print(f"\tControl panel: http://{IP}:{config.PORT}")
+	except Exception:
+		print(f"\tControl panel: http://localhost:{config.PORT}")
+	finally:
+		s.close()
+	print("\n"+"="*70)
 	io_loop = tornado.ioloop.IOLoop.current()
 
 	# Send image
