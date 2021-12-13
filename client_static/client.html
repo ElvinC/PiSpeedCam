@@ -179,13 +179,17 @@
 			var data = JSON.parse(event.data)
 			if (data.type === "image") {
 				img_viewer.src = data.image;
-				update_histogram();
+				
 			}
 			else if (data.type === "status") {
 				debug(data.message);
 			}
 			//debug("Image received");
 		}
+	}
+	
+	document.getElementById("img_viewer").onload = function() {
+		update_histogram();
 	}
 	
 	document.getElementById("send_config_btn").addEventListener('click', function (event) {
@@ -313,7 +317,6 @@
 			var val = bins[2][i]*100/max_val
 			ctx.fillRect(i, 100 - val, 2, val);
 		}
-		console.log(bins)
 	}
 
 
