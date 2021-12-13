@@ -16,6 +16,8 @@ import config
 
 # Detect if running on raspberry pi
 IS_PI = platform.machine() == "armv7l"
+RASPIRAW_PATH = os.path.abspath(os.path.join(config.DEP_PATH, "fork-raspiraw/raspiraw"))
+DCRAW_PATH = os.path.abspath(os.path.join(config.DEP_PATH, "dcraw/dcraw"))
 
 if IS_PI:
 	import RPi.GPIO as GPIO
@@ -23,6 +25,28 @@ else:
 	print("Not running on raspberry pi")
 	print("Some features might not work")
 
+def raspiraw_command(dist, use_ram = True, device=10, fps=1007, gain=100, t=1000, height=75, debug=True):
+	dist = os.path.abspath(dist)
+	command = [RASPIRAW_PATH]
+	command += ["-md", "7"] # 640x480 mode
+	command += ["-g", str(gain)]
+	command += ["-t", str(t)]
+	command += ["-ts", os.path.join(dist, "tstamps.csv")]
+	command += ["-hd0", os.path.join(dist, "hd0.32k")]
+	command += ["-h", str(height)]
+	command += ["-sr 1"] # Save every frame
+	command += ["--voinc 01"]
+	command += ["--fps", str(fps)]
+	command += ["-y", str(device)]
+	command += ["-o", os.path.join(config.RAMDISK_PATH if use_ram else dist, config.RAW_PATTERN)]
+	if not debug:
+		command += ["2>/dev/null >/dev/null"]
+	
+	return " ".join(command)
+	
+def clear_ram_command():
+	return "rm -f /dev/shm/out.*.raw"
+	
 class WebSocketServer(tornado.websocket.WebSocketHandler):
 	clients = set()
 
@@ -50,23 +74,64 @@ class WebSocketServer(tornado.websocket.WebSocketHandler):
 			self.capture_video(data.get("capture_ms"))
 			print("Capturing...")
 			
-		
-
 	@gen.coroutine
 	def capture_video(self, capture_ms):
 		save_path = config.SAVE_PATH + "/" + datetime.now().strftime("%Y-%m-%dT%T")
 		save_path = os.path.abspath(save_path)
 		os.makedirs(save_path)
 		print(f"Saving recording to {save_path}")
+		print(raspiraw_command(save_path, t=capture_ms))
+		save_refresh = config.REFRESH_DELAY
+		config.REFRESH_DELAY = -1
+		#proc = Subprocess(["./scripts/capture_to_ram.sh", save_path, raspiraw_command(save_path, t=capture_ms)], stdout=Subprocess.STREAM,
+		#								  stderr=Subprocess.STREAM)
 		
 		proc = Subprocess(["./scripts/raspiraw_trigger.sh", str(capture_ms), save_path], stdout=Subprocess.STREAM,
+										  stderr=Subprocess.STREAM)
+		
+		
+		yield proc.wait_for_exit(raise_error=False)
+		out, err = yield [proc.stdout.read_until_close(),
+				   proc.stderr.read_until_close()]
+		print(out.decode())
+		print("Capture finished")
+		self.send_message(json.dumps({
+			"type": "status",
+			"message": "Capture finished. Transferring raw files from RAM..."
+		}))
+		
+		proc = Subprocess(["./scripts/ram_to_disk.sh", save_path], stdout=Subprocess.STREAM,
 										  stderr=Subprocess.STREAM)
 		
 		yield proc.wait_for_exit(raise_error=False)
 		out, err = yield [proc.stdout.read_until_close(),
 				   proc.stderr.read_until_close()]
 		print(out.decode())
-		print("Capture and processing finished")
+		print("Transferred")
+		self.send_message(json.dumps({
+			"type": "status",
+			"message": "Raw files saved. Stats: \n" + out.decode()
+		}))
+
+		self.send_message(json.dumps({
+			"type": "status",
+			"message": "Decoding raw images..."
+		}))
+	
+		proc = Subprocess(["./scripts/convert_to_jpg.sh", save_path], stdout=Subprocess.STREAM,
+										  stderr=Subprocess.STREAM)
+		
+		yield proc.wait_for_exit(raise_error=False)
+		out, err = yield [proc.stdout.read_until_close(),
+				   proc.stderr.read_until_close()]
+		print(out.decode())
+		print("Converted")
+		self.send_message(json.dumps({
+			"type": "status",
+			"message": "Raw images decoded. Updating preview"
+		}))
+		
+		config.REFRESH_DELAY = save_refresh
 		config.PLAYBACK_FOLDER = save_path
 
 class MainHandler(tornado.web.RequestHandler):
@@ -81,7 +146,7 @@ class ImageSender:
 
 	def send_image_tick(self, send_callback):
 		now = time.time()
-		if config.REFRESH_DELAY/1000 + self.last_tick < now:
+		if config.REFRESH_DELAY/1000 + self.last_tick < now and config.REFRESH_DELAY > 1:
 			self.last_tick = now
 			filepattern = "out.{:04d}.ppm.png"
 			thisfile = os.path.join(config.PLAYBACK_FOLDER, filepattern.format(self.current_id))
@@ -95,7 +160,10 @@ class ImageSender:
 				#self.current_id = (self.current_id + 1 ) % self.num_images
 				self.current_id += config.SKIP_FRAMES
 				msg = "data:image/png;base64," + base64.b64encode(f.read()).decode()
-				send_callback(msg)
+				send_callback(json.dumps({
+					"type": "image",
+					"image": msg
+				}))
 
 def main():
 	app = tornado.web.Application(
@@ -106,6 +174,7 @@ def main():
 		debug=True,
 	)
 	app.listen(config.PORT)
+	print(f"Server started on port {config.PORT}")
 
 	io_loop = tornado.ioloop.IOLoop.current()
 

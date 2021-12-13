@@ -9,8 +9,8 @@ cd "$2"
 
 fps=1007
 echo "capturing frames for ${1}ms with ${fps}fps requested"
-raspiraw -md 7 -g 100 -t $1 -ts tstamps.csv -hd0 hd0.32k -h 75 --voinc 01 --fps $fps -sr 1 -o /dev/shm/out.%04d.raw 2>/dev/null >/dev/null -y 10
-
+raspiraw -md 7 -g 200 -t $1 -ts tstamps.csv -hd0 hd0.32k -h 75 --voinc 01 --fps $fps -sr 1 -o /dev/shm/out.%04d.raw 2>/dev/null >/dev/null -y 10
+exit 1
 us=`cut -f1 -d, tstamps.csv | sort -n | uniq -c | sort -n | tail -1 | cut -b9-`
 l=`ls -l /dev/shm/out.*.raw | wc --lines`
 echo "$l frames were captured at $((1000000 / $us))fps" 

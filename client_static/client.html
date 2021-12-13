@@ -174,7 +174,13 @@
 		}
 		
 		ws.onmessage = function (event) {
-			img_viewer.src = event.data;
+			var data = JSON.parse(event.data)
+			if (data.type === "image") {
+				img_viewer.src = data.image;
+			}
+			else if (data.type === "status") {
+				debug(data.message);
+			}
 			//debug("Image received");
 		}
 	}
