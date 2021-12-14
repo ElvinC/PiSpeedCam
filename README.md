@@ -23,7 +23,7 @@ The purpose of this repository is to use the existing resources to create an eas
 
 * Remote camera monitoring/control with framerate, resolution, exposure etc.
 * Live video preview
-* Remote trigger interface
+* Remote trigger interface - Working
 * GPIO recording trigger
 * File management and processing
 * Raw image color adjustments
