@@ -78,9 +78,25 @@ class WebSocketServer(tornado.websocket.WebSocketHandler):
 		elif data.get("command") == "CAPTURE":
 			self.capture_video(data.get("capture_ms"))
 			print("Capturing...")
-			
+
+	def send_status(self, msg):
+		self.send_message(json.dumps({
+			"type": "status",
+			"message": msg
+		}))
+
 	@gen.coroutine
 	def capture_video(self, capture_ms):
+		if not IS_PI:
+			self.send_status("Server not on raspberry pi. Simulating capture delay.")
+			save_refresh = config.REFRESH_DELAY
+			config.REFRESH_DELAY = -1
+			yield gen.sleep(capture_ms / 1000)
+			self.send_status("Capture finished.")
+			config.REFRESH_DELAY = save_refresh
+			return
+
+
 		save_path = config.SAVE_PATH + "/" + datetime.now().strftime("%Y-%m-%dT%T")
 		save_path = os.path.abspath(save_path)
 		os.makedirs(save_path)
@@ -100,10 +116,7 @@ class WebSocketServer(tornado.websocket.WebSocketHandler):
 				   proc.stderr.read_until_close()]
 		print(out.decode())
 		print("Capture finished")
-		self.send_message(json.dumps({
-			"type": "status",
-			"message": "Capture finished. Transferring raw files from RAM..."
-		}))
+		self.send_status("Capture finished. Transferring raw files from RAM...")
 		
 		proc = Subprocess(["./scripts/ram_to_disk.sh", save_path], stdout=Subprocess.STREAM,
 										  stderr=Subprocess.STREAM)
@@ -113,15 +126,8 @@ class WebSocketServer(tornado.websocket.WebSocketHandler):
 				   proc.stderr.read_until_close()]
 		print(out.decode())
 		print("Transferred")
-		self.send_message(json.dumps({
-			"type": "status",
-			"message": "Raw files saved. Stats: \n" + out.decode()
-		}))
-
-		self.send_message(json.dumps({
-			"type": "status",
-			"message": "Decoding raw images..."
-		}))
+		self.send_status("Raw files saved. Stats: \n" + out.decode())
+		self.send_status("Decoding raw images...")
 	
 		proc = Subprocess(["./scripts/convert_to_jpg.sh", save_path], stdout=Subprocess.STREAM,
 										  stderr=Subprocess.STREAM)
@@ -131,10 +137,7 @@ class WebSocketServer(tornado.websocket.WebSocketHandler):
 				   proc.stderr.read_until_close()]
 		print(out.decode())
 		print("Converted")
-		self.send_message(json.dumps({
-			"type": "status",
-			"message": "Raw images decoded. Updating preview"
-		}))
+		self.send_status("Raw images decoded. Updating preview")
 		
 		config.REFRESH_DELAY = save_refresh
 		config.PLAYBACK_FOLDER = save_path

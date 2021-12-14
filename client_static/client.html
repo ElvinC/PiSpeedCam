@@ -19,15 +19,26 @@
 			background-color: #202529;
 			box-sizing: border-box;
 			color: white;
+			font-family: sans-serif;
 		}
 
 		#main_container {
-			width: 100%;
+			width: calc(100% - 300px);;
 			height: 100vh;
 			background-color: var(--light1);
 			color: white;
 			font-family: sans-serif;
 			font-size: 18px;
+		}
+
+		#rightbar {
+			float:right;
+			position: absolute;
+			right:0;
+			top:0;
+			width: 300px;
+			padding:5px;
+			box-sizing: border-box;
 		}
 
 		.header {
@@ -71,6 +82,29 @@
 			background-color: var(--warning);
 			box-shadow: 0 0px 3px rgba(0,0,0,0.5);
 		}
+
+		#capture_btn {
+			width: 100%;
+			height: 60px;
+			font-size: 24px;
+			font-weight: bold;
+			color: white;
+			background-color: #d94100;
+			border-radius: 30px;
+			line-height: 0.6em;
+			padding-top: 20px;
+			transition: all 0.2s;
+		}
+
+		#capture_btn:active {
+			background-color: #C73B32;
+			box-shadow: 0 0px 3px rgba(0,0,0,0.5);
+		}
+
+		#capture_btn.inactive {
+			background-color: #555;
+		}
+
 
 		#footer {
 			position: fixed;
@@ -116,10 +150,15 @@
 		<canvas id="histogram" style="border:1px white;border-style: solid;background-color: black;" width="257" height="100"></canvas>
 		<div class="center">Debug log:</div>
 		<div id="debug_log"></div>
-		<div id="footer">
-			<div class="footer_line">Record time (ms)
+
+	</div>
+	<div id="rightbar">
+		<button id="capture_btn">Capture! <br><span style="font-size:9px">(or CTRL+SPACE)</span></button>
+		<center></center>
+		<hr>
+				<div class="footer_line">Record time (ms)
 				<input id="setting_record_len" type="number" value="5000">
-				<button id="capture_btn">Capture!</button>
+				
 				<button>Preview last recording</button>
 				<button>Transfer last recording</button>
 			</div>		
@@ -134,14 +173,13 @@
 				Saturation <input type="number" step="0.01" value="1" id="preview_saturation">
 				<button id="preview_filter_btn">Apply</button>
 			</div>
-		</div>
-
 	</div>
 
 </body>
 <script type="text/javascript">
 	var ws;
 	var connected = false;
+	var capturing = false;
 
 
 	function debug(msg) {
@@ -182,7 +220,7 @@
 				update_histogram();
 			}
 			else if (data.type === "status") {
-				debug(data.message);
+				debug("[SERVER] " + data.message);
 			}
 			//debug("Image received");
 		}
@@ -198,15 +236,29 @@
 		}
 		debug("Sending config");
 	}, false)
-	
-	document.getElementById("capture_btn").addEventListener('click', function (event) {
-		if (connected) {
+
+	function trigger_capture() {
+		if (connected && !capturing) {
+			var capture_ms = parseInt(document.getElementById("setting_record_len").value)
 			ws.send(JSON.stringify({
 				command: "CAPTURE",
-				capture_ms: parseInt(document.getElementById("setting_record_len").value)
+				capture_ms: capture_ms
 			}))
-		}
+		
 		debug("Sending capture command");
+		
+		document.getElementById("capture_btn").classList.add("inactive");
+		capturing = true;
+		setTimeout(function() {
+			document.getElementById("capture_btn").classList.remove("inactive");
+			capturing = false;
+		}, capture_ms)
+
+		}
+	}
+	
+	document.getElementById("capture_btn").addEventListener('click', function (event) {
+		trigger_capture();
 	}, false)
 	
 	function update_preview_filters(event) {
@@ -313,9 +365,13 @@
 			var val = bins[2][i]*100/max_val
 			ctx.fillRect(i, 100 - val, 2, val);
 		}
-		console.log(bins)
 	}
 
+	document.addEventListener('keydown', function(event) {
+		if (event.ctrlKey && event.key === ' ') {
+			trigger_capture()
+		}
+	});
 
 
 
