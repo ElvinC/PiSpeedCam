@@ -6,7 +6,7 @@ cd "$1"
 echo "dcraw each .raw file (to .ppm)"
 for f in out.*.raw
 do
-  /home/pi/dcraw/dcraw -W $f
+  /home/pi/Documents/code/PiSpeedCam/dependencies/dcraw/dcraw -W $f
   echo -en "$f     \r"
 done
 echo

@@ -1,9 +1,10 @@
 PORT = 8081
-REFRESH_DELAY = 100 # 10 fps
+REFRESH_DELAY = 500 # 10 fps
 SKIP_FRAMES = 1
 SAVE_PATH = "captures"
 DEP_PATH = "dependencies"
 CAPTURE_MS = 1000
 PLAYBACK_FOLDER = "captures/placeholder/"
+LAST_PATH = "captures/placeholder/"
 RAMDISK_PATH = "/dev/shm/"
 RAW_PATTERN = "out.%04d.raw"
