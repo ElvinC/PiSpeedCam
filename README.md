@@ -6,12 +6,12 @@ Start server:
 
 `pip3 install -r requirements.txt`
 
-`python main.py`
+`python3 main.py`
 
 Open `[Raspbery-pi IP]:8081` in a browser to access the control panel.
 
 ## What is this?
-High speed footage is cool, but proper high speed cameras cost thousands or tens of thousands of dollars. It turns out that the raspberry pi, when combined with an inexpensive camera module, is capable of recording approximate 1000 fps at a resolution of 640x75 pixels. The result is an imaging system costing less than $100, that can be used experiment with high speed videography.
+High speed footage is cool, but proper high speed cameras cost thousands or tens of thousands of dollars. It turns out that the raspberry pi, when combined with an inexpensive camera module, is capable of recording approximate 1000 fps at a resolution of 640x75 pixels. The result is an imaging system costing less than $100, that can be used to experiment with high speed videography.
 
 The "hard work" to make this possible has already been done by namely Herman-SW and 6by9, so check out the following for more technical details: 
 * https://github.com/Hermann-SW/fork-raspiraw
@@ -21,13 +21,17 @@ Furthermore RobertElderSoftware has an excellent technical guide on capturing hi
 
 The purpose of this repository is to use the existing resources to create an easy to use high speed imaging package. In particular, with the following key features in mind:
 
-* Remote camera monitoring/control with framerate, resolution, exposure etc.
-* Live video preview
+* Remote camera monitoring/control with framerate, resolution, exposure etc. - Working-ish
+* File management and processing - Working
 * Remote trigger interface - Working
+* Video playback - working
+* Live video preview - semi-working
+* Video transfer
 * GPIO recording trigger
-* File management and processing
 * Raw image color adjustments
 * Timestamp overlay for time-sensitive video analysis
+
+Misc.
 * Run as service at startup
 * 3D printed parts for tripod mounting
 * Optional wifi hotspot
