@@ -29,6 +29,17 @@ else:
 	print("Not running on raspberry pi")
 	print("Some features might not work")
 
+config.all_recordings = {rec: {"name": rec, "frames": 0} for rec in sorted(os.listdir(config.SAVE_PATH)) if rec[0].isnumeric()}
+for recording in config.all_recordings:
+	tstampfile = os.path.join(config.SAVE_PATH, config.all_recordings.get(recording)["name"], "tstamps.csv")
+	try:
+		with open(tstampfile) as f:
+			config.all_recordings.get(recording)["frames"] = sum(1 for line in f)
+	except FileNotFoundError:
+		pass
+#for c in config.all_recordings.keys():
+#	print(c)
+	
 def raspiraw_command(dist, use_ram = True, sr=1, device=10, fps=1007, gain=100, eus=600, t=1000, height=75, outfile=False, debug=False):
 	dist = os.path.abspath(dist)
 	command = [RASPIRAW_PATH]
@@ -57,8 +68,15 @@ class WebSocketServer(tornado.websocket.WebSocketHandler):
 	clients = set()
 	currently_recording = False
 
+	def get_recording_json(self):
+		return json.dumps({
+			"type": "recordings",
+			"recordings": list(config.all_recordings.values())
+		})
+
 	def open(self):
 		WebSocketServer.clients.add(self)
+		self.write_message(self.get_recording_json())
 
 	def on_close(self):
 		WebSocketServer.clients.remove(self)
@@ -106,8 +124,15 @@ class WebSocketServer(tornado.websocket.WebSocketHandler):
 			self.capture_video(data.get("capture_ms"), data.get("gain"), data.get("exposure"))
 			print("Capturing...")
 		elif data.get("command") == "PROCESS":
-			self.process_video()
+			self.process_video(os.path.join(config.SAVE_PATH ,data.get("recording")))
 			print("Processing")
+		elif data.get("command") == "PLAY":
+			play_folder = os.path.join(config.SAVE_PATH, data.get("recording"))
+			if os.path.isdir(play_folder):
+				config.PLAYBACK_FOLDER = play_folder
+		else:
+			print("Unknown command from client:")
+			print(data)
 	def send_status(self, msg):
 		self.send_message(json.dumps({
 			"type": "status",
@@ -145,22 +170,20 @@ class WebSocketServer(tornado.websocket.WebSocketHandler):
 			return
 
 		self.currently_recording = True
-		save_path = config.SAVE_PATH + "/" + datetime.now().strftime("%Y-%m-%dT%T")
+		foldername = datetime.now().strftime("%Y-%m-%dT%T")
+		save_path = config.SAVE_PATH + "/" + foldername
 		save_path = os.path.abspath(save_path)
 		os.makedirs(save_path)
 		print(f"Saving recording to {save_path}")
 		print(raspiraw_command(save_path, t=capture_ms))
 		save_refresh = config.REFRESH_DELAY
 		config.REFRESH_DELAY = -1
-		#proc = Subprocess(["./scripts/capture_to_ram.sh", save_path, raspiraw_command(save_path, t=capture_ms)], stdout=Subprocess.STREAM,
-		#								  stderr=Subprocess.STREAM)
 		
 		out, err = yield self.execute_bash(["rm -f /dev/shm/out.*.raw"], shell=True)
-
 		
 		out, err = yield self.execute_bash(raspiraw_command(save_path, t=capture_ms, gain=gain, eus=exposure, debug=False), shell=True)
 		
-		#out, err = yield self.execute_bash(["./scripts/raspiraw_trigger.sh", str(capture_ms), save_path])
+		
 		print(out.decode())
 		print("Capture finished. Transferring...")
 		self.send_status("Capture finished. Transferring raw files from RAM...")
@@ -172,15 +195,52 @@ class WebSocketServer(tornado.websocket.WebSocketHandler):
 		self.currently_recording = False
 		config.LAST_PATH = save_path
 		
-		out, err = yield self.execute_bash([DCRAW_PATH + f" -c -W {save_path + '/out.0001.raw'} | pnmtopng > {save_path + '/out.0001.ppm.png'}"], shell=True)
+		out, err = yield self.execute_bash([DCRAW_PATH + f" -c -r 1.2 1 1.3 1 -k 63 -W {save_path + '/out.0001.raw'} | pnmtopng > {save_path + '/out.0001.ppm.png'}"], shell=True)
+
+		tstampfile = os.path.join(save_path, "tstamps.csv")
+		number_frames = 0
+		try:
+			with open(tstampfile) as f:
+				number_frames = sum(1 for line in f)
+		except FileNotFoundError:
+			pass
+
+		config.all_recordings[foldername] = {"name": foldername, "frames": number_frames}
+		self.send_message(self.get_recording_json())
 
 		config.REFRESH_DELAY = save_refresh
 		config.PLAYBACK_FOLDER = save_path
 		
+	@gen.coroutine
+	def process_frames_worker(self, save_path, start = 1, stop= False, worker_id=0, total_workers=4):
+		idx = start
+		infilepattern = "out.{:04d}.raw"
+		outfilepattern = "out.{:04d}.ppm.png"
+		while not stop or idx <= stop: 
+			thisfile = os.path.join(save_path, infilepattern.format(idx))
+			
+			if idx % total_workers == worker_id:				
+				if not os.path.isfile(thisfile):
+					break
+					
+				# Convert file
+				outfile = os.path.join(save_path, outfilepattern.format(idx))
+				print(idx)
+				out, err = yield self.execute_bash([DCRAW_PATH + f" -c -r 1.2 1 1.3 1 -k 63 -W {thisfile} | pnmtopng > {outfile}"], shell=True)
+				
+			if idx % 100 == 0 and worker_id==0:
+				self.send_status(f"{idx} frames processed")
+			idx += 1
 
 	@gen.coroutine
-	def process_video(self):
-		save_path = config.LAST_PATH
+	def process_video(self, save_path=None):
+		if not save_path:
+			save_path = config.LAST_PATH
+		config.PLAYBACK_FOLDER = save_path
+		res = yield tornado.gen.multi([self.process_frames_worker(save_path, worker_id=idx, total_workers=config.converter_threads) for idx in range(config.converter_threads)])
+		print("Processing done")
+		config.PLAYBACK_FOLDER = save_path
+		return 0
 		self.send_status("Decoding raw images...")
 		
 		out, err = yield self.execute_bash(["./scripts/convert_to_jpg.sh", save_path])
@@ -222,10 +282,12 @@ class ImageSender:
 				msg = "data:image/png;base64," + base64.b64encode(f.read()).decode()
 				send_callback(json.dumps({
 					"type": "image",
-					"image": msg
+					"image": msg,
+					"frame_id": self.current_id
 				}))
 
 def main():
+
 	app = tornado.web.Application(
 		[(r"/websocket/", WebSocketServer),
 		 (r"/", MainHandler)],

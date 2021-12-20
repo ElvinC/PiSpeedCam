@@ -6,7 +6,8 @@ cd "$1"
 echo "dcraw each .raw file (to .ppm)"
 for f in out.*.raw
 do
-  /home/pi/Documents/code/PiSpeedCam/dependencies/dcraw/dcraw -W $f
+  NUM=$(echo {$f} | cut -c6-9)
+  /home/pi/Documents/code/PiSpeedCam/dependencies/dcraw/dcraw -W -r 1.2 1 1.3 1 -c $f | pnmtopng > out.$NUM.ppm.png
   echo -en "$f     \r"
 done
 echo
@@ -27,6 +28,7 @@ echo
 #  echo -en "$f     \r"
 #done
 echo
+exit 1
 
 echo ".ppm.d -> .ppm.d.png"
 for f in out.*.ppm

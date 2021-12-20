@@ -14,10 +14,10 @@ echo "$l frames were captured at $((1000000 / $us))fps"
 #per=`expr \( 100 \* $skips \) / \( $skips + $stamps \)`
 #echo "$per% frame skips"
 
-echo "removing old auxiliary files"
+#echo "removing old auxiliary files"
 rm -f out.*.raw out.*.ppm out.*.ppm.[dDT] out.*.ppm.d.png
 
-echo "copying /dev/shm/out.????.raw files"
+#echo "copying /dev/shm/out.????.raw files"
 for((f=1; f<=$l; ++f))
 do
   # cp /dev/shm/out.$(printf "%04d" $f).raw .

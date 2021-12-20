@@ -146,6 +146,7 @@
 			Preview:
 			<img id="img_viewer" src="">
 		</div>
+		<div>frame: <span id="frame_id">0</span></div>
 		Color Histogram: <br>
 		<canvas id="histogram" style="border:1px white;border-style: solid;background-color: black;" width="257" height="100"></canvas>
 		<div class="center">Debug log:</div>
@@ -165,7 +166,7 @@
 				Exp
 				<input id="setting_exposure" type="number" value="700">
 				
-				<button id="process_btn">Preview last recording</button>
+				
 			</div>		
 			<div class="footer_line">
 				Skip frames: <input type="number" value="1" id="setting_skip_frame">
@@ -178,6 +179,12 @@
 				Saturation <input type="number" step="0.01" value="1" id="preview_saturation">
 				<button id="preview_filter_btn">Apply</button>
 			</div>
+			
+			Playback: <br>
+			<select id="recording_select"> </select>
+			<br>
+			<button id="process_btn">(re)process recording</button> <br>
+			<button id="play_recording_btn">Play recording</button>
 	</div>
 
 </body>
@@ -185,6 +192,7 @@
 	var ws;
 	var connected = false;
 	var capturing = false;
+	var prev_recordings = [];
 
 
 	function debug(msg) {
@@ -222,10 +230,26 @@
 			var data = JSON.parse(event.data)
 			if (data.type === "image") {
 				img_viewer.src = data.image;
+				frame_id.innerText = data.frame_id
 				
 			}
 			else if (data.type === "status") {
 				debug("[SERVER] " + data.message);
+			}
+			else if(data.type === "recordings") {
+				
+				debug("Recording list updated")
+				//debug(data.recordings);
+				console.log(data.recordings)
+				
+				var recording_select_input = document.getElementById("recording_select")
+				for (var i = 0; i < data.recordings.length; i++){
+					if (prev_recordings.indexOf(data.recordings[i]) === -1) {
+						recording_select_input.add(new Option(data.recordings[i].name + " (frames: " + data.recordings[i].frames + ")", data.recordings[i].name), 0); // add to beginning
+						prev_recordings.push(data.recordings[i])
+					}
+				}
+				recording_select_input.selectedIndex = 0;
 			}
 			//debug("Image received");
 		}
@@ -278,10 +302,23 @@
 		if (connected) {
 		
 			ws.send(JSON.stringify({
-				command: "PROCESS"
+				command: "PROCESS",
+				recording: document.getElementById("recording_select").value
 			}))
 		}
 	}, false)
+	
+	
+	document.getElementById("play_recording_btn").addEventListener('click', function (event) {
+		if (connected) {
+		
+			ws.send(JSON.stringify({
+				command: "PLAY",
+				recording: document.getElementById("recording_select").value
+			}))
+		}
+	}, false)
+	
 	
 	function update_preview_filters(event) {
 		var brightness = parseFloat(document.getElementById("preview_brightness").value);
