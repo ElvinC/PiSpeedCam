@@ -157,10 +157,15 @@
 		<center></center>
 		<hr>
 				<div class="footer_line">Record time (ms)
-				<input id="setting_record_len" type="number" value="5000">
+				<input id="setting_record_len" type="number" value="1000">
+				<br>
+				Gain
+				<input id="setting_gain" type="number" value="200">
+				<br>
+				Exp
+				<input id="setting_exposure" type="number" value="700">
 				
-				<button>Preview last recording</button>
-				<button>Transfer last recording</button>
+				<button id="process_btn">Preview last recording</button>
 			</div>		
 			<div class="footer_line">
 				Skip frames: <input type="number" value="1" id="setting_skip_frame">
@@ -244,9 +249,13 @@
 	function trigger_capture() {
 		if (connected && !capturing) {
 			var capture_ms = parseInt(document.getElementById("setting_record_len").value)
+			var gain = parseInt(document.getElementById("setting_gain").value)
+			var exposure = parseInt(document.getElementById("setting_exposure").value)
 			ws.send(JSON.stringify({
 				command: "CAPTURE",
-				capture_ms: capture_ms
+				capture_ms: capture_ms,
+				gain: gain,
+				exposure: exposure
 			}))
 		
 		debug("Sending capture command");
@@ -263,6 +272,15 @@
 	
 	document.getElementById("capture_btn").addEventListener('click', function (event) {
 		trigger_capture();
+	}, false)
+	
+	document.getElementById("process_btn").addEventListener('click', function (event) {
+		if (connected) {
+		
+			ws.send(JSON.stringify({
+				command: "PROCESS"
+			}))
+		}
 	}, false)
 	
 	function update_preview_filters(event) {
