@@ -2,13 +2,25 @@
 Low cost 1000fps high speed camera based on raspberry pi
 
 ## Usage
+Clone project: 
+`git clone https://github.com/ElvinC/PiSpeedCam.git`
+
+Navigate to folder with `cd PiSpeedCam` and install dependencies: `pip3 install -r requirements.txt`
+
 Start server:
-
-`pip3 install -r requirements.txt`
-
 `python3 main.py`
 
-Open `[Raspbery-pi IP]:8081` in a browser to access the control panel.
+Open `[Raspbery-pi IP]:8081` in a browser to access the control panel. This can be on a different computer on the same network.
+
+Set the desired capture time (max is about 6000 ms with the Raspberry Pi 3) and hit capture. Wait for capture completion and transfer to RAM.
+
+Select the newest recording from the dropdown and hit "(re)process recording". With parallel processing this takes about 7 minutes for a 5 second recording.
+
+Recording can be played after processing.
+
+Transferring the recording can be done with `scp` or a flash disk. Integrated transfer is work in progress.
+
+For best result, import the PNG sequence directly into a video editor and apply color correction/constrast adjustments.
 
 ## What is this?
 High speed footage is cool, but proper high speed cameras cost thousands or tens of thousands of dollars. It turns out that the raspberry pi, when combined with an inexpensive camera module, is capable of recording approximate 1000 fps at a resolution of 640x75 pixels. The result is an imaging system costing less than $100, that can be used to experiment with high speed videography.
@@ -25,7 +37,7 @@ The purpose of this repository is to use the existing resources to create an eas
 * File management and processing - Working
 * Remote trigger interface - Working
 * Video playback - working
-* Live video preview - semi-working
+* Live video preview - semi-working, inactive due to camera lockup problems
 * Video transfer
 * GPIO recording trigger
 * Raw image color adjustments
