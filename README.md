@@ -10,7 +10,7 @@ Low cost 1000fps high speed camera based on raspberry pi
 4. Build dependencies: `./init.sh`
 
 ## Usage
-1. (After reboot) run ./dependencies/fork-raspiraw/camera_i2c
+1. (After reboot) run `./dependencies/fork-raspiraw/camera_i2c`
 2. Start server: `python3 main.py`
 3. Open `[Raspbery-pi IP]:8081` in a browser to access the control panel. This can be on a different computer on the same network.
 4. Set the desired capture time (max is about 6000 ms with the Raspberry Pi 3) and hit capture. Wait for capture completion and transfer to RAM.
@@ -60,3 +60,7 @@ TODO:
 The following are currently used for development, but others may work as well
 * Raspberry Pi V2 camera module (https://www.raspberrypi.com/products/camera-module-v2/)
 * Raspberry Pi 3B
+
+
+## Contribution
+Feel free open a PR if you add implement something cool/useful.
