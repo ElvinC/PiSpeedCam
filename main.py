@@ -170,7 +170,7 @@ class WebSocketServer(tornado.websocket.WebSocketHandler):
 			return
 
 		self.currently_recording = True
-		foldername = datetime.now().strftime("%Y-%m-%dT%T")
+		foldername = datetime.now().strftime("%Y-%m-%dT%H.%M.%S")
 		save_path = config.SAVE_PATH + "/" + foldername
 		save_path = os.path.abspath(save_path)
 		os.makedirs(save_path)
