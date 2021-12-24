@@ -1,5 +1,5 @@
 # PiSpeedCam
-Low cost 1000fps high speed camera based on raspberry pi
+Low cost 1000fps high speed camera based on Raspberry Pi
 
 ## Installation
 1. Clone project (including submodules): 
@@ -15,7 +15,7 @@ Low cost 1000fps high speed camera based on raspberry pi
 3. Open `[Raspbery-pi IP]:8081` in a browser to access the control panel. This can be on a different computer on the same network.
 4. Set the desired capture time (max is about 6000 ms with the Raspberry Pi 3) and hit capture. Wait for capture completion and transfer to RAM.
 5. Select the newest recording from the dropdown and hit "(re)process recording". With parallel processing this takes about 7 minutes for a 5 second recording.
-6. Recording can be played after processing.
+6. Recording can be played after processing. Adjust preview brightness/contrast if needed.
 
 Recordings are stored in the `captures` folder as a separete folder for each recording.
 Transferring the recording can be done with `scp` or a flash disk. Integrated transfer is work in progress.
@@ -63,4 +63,4 @@ The following are currently used for development, but others may work as well
 
 
 ## Contribution
-Feel free open a PR if you add implement something cool/useful.
+Feel free open a PR if you add something cool/useful.
