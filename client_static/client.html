@@ -158,19 +158,18 @@
 		<center></center>
 		<hr>
 				<div class="footer_line">Record time (ms)
-				<input id="setting_record_len" type="number" value="1000">
+				<input id="setting_record_len" type="number" value="100">
 				<br>
 				Gain
 				<input id="setting_gain" type="number" value="200">
-				<br>
-				Exp
+				Exp (unused)
 				<input id="setting_exposure" type="number" value="700">
 				
 				
 			</div>		
 			<div class="footer_line">
-				Skip frames: <input type="number" value="1" id="setting_skip_frame">
-				FPS: <input type="number" value="10" id="setting_playback_fps" min="1" max="25">
+				Skip frames: <input type="number" value="1" id="setting_skip_frame"> <br>
+				FPS: <input type="number" value="10" id="setting_playback_fps" min="1" max="25"> <br>
 				<button id="send_config_btn">Apply</button>
 			</div>
 			<div class="footer_line">
@@ -185,6 +184,7 @@
 			<br>
 			<button id="process_btn">(re)process recording</button> <br>
 			<button id="play_recording_btn">Play recording</button>
+			<div id="recording_info"></div>
 	</div>
 
 </body>
@@ -193,6 +193,7 @@
 	var connected = false;
 	var capturing = false;
 	var prev_recordings = [];
+	var homepath = "";
 
 
 	function debug(msg) {
@@ -240,7 +241,9 @@
 				
 				debug("Recording list updated")
 				//debug(data.recordings);
-				console.log(data.recordings)
+				console.log(data.recordings);
+				homepath = data.homepath;
+				console.log(homepath);
 				
 				var recording_select_input = document.getElementById("recording_select")
 				for (var i = 0; i < data.recordings.length; i++){
@@ -318,6 +321,11 @@
 			}))
 		}
 	}, false)
+	
+	document.getElementById("recording_select").onchange = function(event) {
+		var recfolder = document.getElementById("recording_select").value;
+		document.getElementById("recording_info").innerHTML = "scp -r pi@" + location.hostname + ":" + homepath + recfolder + " " + recfolder;
+	}
 	
 	
 	function update_preview_filters(event) {

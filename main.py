@@ -1,3 +1,11 @@
+import time
+import sys
+
+def debug():
+	for i in range(100):
+		print(i)
+		sys.stdout.flush()
+		time.sleep(1)
 import random
 import json
 import tornado.ioloop
@@ -6,25 +14,39 @@ import tornado.websocket
 from tornado.process import Subprocess
 from tornado import gen
 from subprocess import PIPE
+import subprocess as SP
 import base64
 import platform
 import os
-import time
 from datetime import datetime
 import socket
 
+abspath = os.path.abspath(__file__)
+dname = os.path.dirname(abspath)
+os.chdir(dname)
+
 import config
-
-
-
 
 # Detect if running on raspberry pi
 IS_PI = platform.machine() == "armv7l"
 RASPIRAW_PATH = os.path.abspath(os.path.join(config.DEP_PATH, "fork-raspiraw/raspiraw"))
 DCRAW_PATH = os.path.abspath(os.path.join(config.DEP_PATH, "dcraw/dcraw"))
+CAM_I2C_PATH = os.path.abspath(os.path.join(config.DEP_PATH, "fork-raspiraw/camera_i2c"))
+print(CAM_I2C_PATH)
+sys.stdout.flush()
+trigger_pin = 14
+trigger_capture_length = config.DEFAULT_CAPTURE_MS
 
 if IS_PI:
 	import RPi.GPIO as GPIO
+	GPIO.setmode(GPIO.BCM)
+	GPIO.setup(trigger_pin, GPIO.OUT)
+	for i in range(10):
+		GPIO.output(trigger_pin, True)
+		time.sleep(0.1)
+		GPIO.output(trigger_pin, False)
+		time.sleep(0.1)
+	GPIO.setup(trigger_pin, GPIO.IN)
 else:
 	print("Not running on raspberry pi")
 	print("Some features might not work")
@@ -39,7 +61,31 @@ for recording in config.all_recordings:
 		pass
 #for c in config.all_recordings.keys():
 #	print(c)
-	
+
+def cam_i2c_command():
+	command = [CAM_I2C_PATH]
+	res = SP.check_output(command)
+	print(res.decode("utf8"))
+
+cam_i2c_command()
+
+def gain_from_file():
+	gain = 150
+	with open("gain.txt", "r") as f:
+		try:
+			newgain = int(f.readlines()[0])
+			print(newgain)
+			gain = newgain
+		except:
+			pass
+	return max(min(gain, 240), 1)
+
+def gain_to_file(gain=150):
+	with open("gain.txt", "w") as f:
+		f.write(str(gain))
+
+default_gain = gain_from_file()
+
 def raspiraw_command(dist, use_ram = True, sr=1, device=10, fps=1007, gain=100, eus=600, t=1000, height=75, outfile=False, debug=False):
 	dist = os.path.abspath(dist)
 	command = [RASPIRAW_PATH]
@@ -67,11 +113,16 @@ def raspiraw_command(dist, use_ram = True, sr=1, device=10, fps=1007, gain=100, 
 class WebSocketServer(tornado.websocket.WebSocketHandler):
 	clients = set()
 	currently_recording = False
+	capture_ms = 5000
+	gain = default_gain
+	exposure = 700
 
+	@classmethod
 	def get_recording_json(self):
 		return json.dumps({
 			"type": "recordings",
-			"recordings": list(config.all_recordings.values())
+			"recordings": list(config.all_recordings.values()),
+			"homepath": os.path.join(os.path.abspath(os.getcwd()), config.SAVE_PATH, "")
 		})
 
 	def open(self):
@@ -93,7 +144,7 @@ class WebSocketServer(tornado.websocket.WebSocketHandler):
 	def send_live_image(self):
 		if self.currently_recording:
 			return
-			
+
 		out, err = yield self.execute_bash(self, ["rm", "-f", "/dev/shm/out.*.raw"])
 		print("0")
 		self.currently_recording = True
@@ -111,7 +162,6 @@ class WebSocketServer(tornado.websocket.WebSocketHandler):
 				"type": "image",
 				"image": msg
 			}))
-		
 
 	def on_message(self, message):
 		print("Received: " + message)
@@ -133,25 +183,36 @@ class WebSocketServer(tornado.websocket.WebSocketHandler):
 		else:
 			print("Unknown command from client:")
 			print(data)
+
+	@classmethod
+	@gen.coroutine
 	def send_status(self, msg):
 		self.send_message(json.dumps({
 			"type": "status",
 			"message": msg
 		}))
 
+	@classmethod
 	@gen.coroutine
 	def execute_bash(self, cmd, shell=False):
-		proc = Subprocess(cmd, stdout=Subprocess.STREAM,
-										  stderr=Subprocess.STREAM, shell=shell)
-		
+		proc = Subprocess(cmd, stdout=Subprocess.STREAM, stderr=Subprocess.STREAM, shell=shell)
 		
 		yield proc.wait_for_exit(raise_error=False)
 		out, err = yield [proc.stdout.read_until_close(),
 				   proc.stderr.read_until_close()]
 		return out, err
 
+	@classmethod
+	@gen.coroutine
+	def capture_default(self):
+		self.capture_video(trigger_capture_length, self.gain, self.exposure)
+
+	@classmethod
 	@gen.coroutine
 	def capture_video(self, capture_ms, gain, exposure):
+		self.capture_ms = capture_ms
+		self.gain = gain
+		self.exposure = exposure
 		for i in range(1000):
 			yield gen.sleep(0.05)
 			if not self.currently_recording:
@@ -170,19 +231,18 @@ class WebSocketServer(tornado.websocket.WebSocketHandler):
 			return
 
 		self.currently_recording = True
-		foldername = datetime.now().strftime("%Y-%m-%dT%T")
+		foldername = datetime.now().strftime("%Y-%m-%dT%H.%M.%S")
 		save_path = config.SAVE_PATH + "/" + foldername
 		save_path = os.path.abspath(save_path)
 		os.makedirs(save_path)
 		print(f"Saving recording to {save_path}")
-		print(raspiraw_command(save_path, t=capture_ms))
 		save_refresh = config.REFRESH_DELAY
 		config.REFRESH_DELAY = -1
 		
 		out, err = yield self.execute_bash(["rm -f /dev/shm/out.*.raw"], shell=True)
-		
-		out, err = yield self.execute_bash(raspiraw_command(save_path, t=capture_ms, gain=gain, eus=exposure, debug=False), shell=True)
-		
+		raspicommand = raspiraw_command(save_path, t=capture_ms, gain=gain, eus=exposure, debug=False)
+		print(raspicommand)
+		out, err = yield self.execute_bash(raspicommand, shell=True)
 		
 		print(out.decode())
 		print("Capture finished. Transferring...")
@@ -207,7 +267,7 @@ class WebSocketServer(tornado.websocket.WebSocketHandler):
 
 		config.all_recordings[foldername] = {"name": foldername, "frames": number_frames}
 		self.send_message(self.get_recording_json())
-
+		gain_to_file(self.gain)
 		config.REFRESH_DELAY = save_refresh
 		config.PLAYBACK_FOLDER = save_path
 		
@@ -276,15 +336,27 @@ class ImageSender:
 				self.current_id = 1
 				thisfile = os.path.join(config.PLAYBACK_FOLDER, filepattern.format(self.current_id))
 				
-			with open(thisfile, "rb") as f:
-				#self.current_id = (self.current_id + 1 ) % self.num_images
-				self.current_id += config.SKIP_FRAMES
-				msg = "data:image/png;base64," + base64.b64encode(f.read()).decode()
-				send_callback(json.dumps({
-					"type": "image",
-					"image": msg,
-					"frame_id": self.current_id
-				}))
+			if os.path.isfile(thisfile):
+				with open(thisfile, "rb") as f:
+					#self.current_id = (self.current_id + 1 ) % self.num_images
+					self.current_id += config.SKIP_FRAMES
+					msg = "data:image/png;base64," + base64.b64encode(f.read()).decode()
+					send_callback(json.dumps({
+						"type": "image",
+						"image": msg,
+						"frame_id": self.current_id
+					}))
+class Trigger:
+	def __init__(self):
+		self.past_state = False
+		self.state = False
+	def trigger_tick(self, trigger_callback):
+		self.past_state = self.state
+		self.state = GPIO.input(trigger_pin)
+
+		if self.state and not self.past_state:
+			trigger_callback()
+
 
 def main():
 
@@ -315,10 +387,17 @@ def main():
 
 	# Send image
 	sender = ImageSender()
+	trig = Trigger()
+
 	periodic_callback = tornado.ioloop.PeriodicCallback(
 		lambda: sender.send_image_tick(WebSocketServer.send_message), 1
 	)
 	periodic_callback.start()
+
+	trig_callback = tornado.ioloop.PeriodicCallback(
+		lambda: trig.trigger_tick(WebSocketServer.capture_default), 10
+	)
+	trig_callback.start()
 
 	# Start the event loop.
 	io_loop.start()
